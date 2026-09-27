@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>BuZfinance</title>
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0F1B16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BuZfinance">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<!-- Sin librerías externas para JS: los gráficos se dibujan con Canvas nativo, así la app funciona 100% sin conexión -->
+<style>
+  :root{
+    --ink:#0F1B16;
+    --surface:#16241D;
+    --surface-2:#1D2E25;
+    --line:rgba(237,234,224,0.09);
+    --text:#EDEAE0;
+    --muted:#93A199;
+    --gold:#C9A24B;
+    --gold-soft:rgba(201,162,75,0.14);
+    --sage:#74A688;
+    --sage-soft:rgba(116,166,136,0.14);
+    --rust:#C1573C;
+    --rust-soft:rgba(193,87,60,0.14);
+    --radius:14px;
+    --serif:'Fraunces', serif;
+    --sans:'IBM Plex Sans', -apple-system, sans-serif;
+    --mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html{width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  html,body{margin:0;padding:0;width:100%;max-width:100vw;overflow-x:hidden;}
+  body{
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:calc(78px + env(safe-area-inset-bottom));
+  }
+  ::selection{background:var(--gold-soft);}
+  a{color:inherit;}
+  button{font-family:inherit;}
+
+  /* ---- layout shell ---- */
+  .app{width:100%;max-width:560px;margin:0 auto;position:relative;min-height:100vh;}
+  header.top{
+    padding:22px 20px 16px;
+    display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:1px solid var(--line);
+  }
+  header.top .brand{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:0.2px;}
+  header.top .brand em{font-style:normal;color:var(--gold);}
+  header.top .today{font-size:12.5px;color:var(--muted);text-transform:lowercase;}
+
+  main{padding:14px 16px 40px;}
+  .view{display:none;animation:fadeIn .28s ease both;}
+  .view.active{display:block;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  @media (prefers-reduced-motion:reduce){.view{animation:none;}}
+
+  h1.page-title{font-family:var(--serif);font-weight:600;font-size:22px;margin:0 0 4px;}
+  p.page-sub{color:var(--muted);font-size:13.5px;margin:0 0 20px;line-height:1.5;}
+
+  /* ---- hero patrimonio ---- */
+  .hero{
+    background:linear-gradient(165deg, var(--surface-2), var(--surface));
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:18px 18px;
+    margin-bottom:12px;
+  }
+  .hero .label{font-size:12.5px;color:var(--muted);}
+  .hero .amount{font-family:var(--serif);font-size:36px;font-weight:600;letter-spacing:-0.5px;margin:3px 0 6px;}
+  .hero .delta{font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;}
+  .delta.up{background:var(--sage-soft);color:var(--sage);}
+  .delta.down{background:var(--rust-soft);color:var(--rust);}
+  .delta.flat{background:var(--line);color:var(--muted);}
+
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+  .stat{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px 10px;
+  }
+  .stat .k{font-size:10px;color:var(--muted);margin-bottom:4px;line-height:1.3;}
+  .stat .v{font-family:var(--serif);font-size:15px;font-weight:600;}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 14px;margin-bottom:12px;
+  }
+  .card h2{font-family:var(--serif);font-size:15px;font-weight:600;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;}
+  .card h2 .sel{font-family:var(--sans);font-size:12.5px;color:var(--muted);border:1px solid var(--line);background:transparent;border-radius:8px;padding:5px 9px;}
+
+  .chart-wrap{position:relative;height:120px;width:100%;overflow:hidden;}
+  .chart-wrap.tall{height:140px;}
+  .chart-wrap canvas{display:block;width:100%;height:100%;}
+
+  /* legend for donut */
+  .legend{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+  .legend-row{display:flex;align-items:center;gap:8px;font-size:12px;}
+  .legend-row .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .legend-row .name{flex:1;color:var(--text);}
+  .legend-row .val{font-family:var(--mono);font-size:12.5px;color:var(--muted);}
+
+  /* ---- forms ---- */
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:13.5px;color:var(--muted);margin-bottom:8px;font-weight:500;}
+  .field input, .field select{
+    width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    padding:14px 14px;border-radius:10px;font-size:16px;font-family:inherit;
+  }
+  .field input:focus, .field select:focus{outline:none;border-color:var(--gold);}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    background:var(--gold);color:#1B1408;border:none;border-radius:10px;
+    padding:16px 18px;font-size:16px;font-weight:600;cursor:pointer;width:100%;
+  }
+  .btn:active{transform:scale(0.99);}
+  .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--line);}
+  .btn.danger{background:transparent;color:var(--rust);border:1px solid var(--rust);}
+  .btn.small{width:auto;padding:8px 12px;font-size:13px;}
+
+  /* ---- list rows (gastos, inversiones) ---- */
+  .list{display:flex;flex-direction:column;}
+  .item{
+    display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);
+  }
+  .item:last-child{border-bottom:none;}
+  .item .swatch{width:8px;height:34px;border-radius:4px;flex:none;}
+  .item .body{flex:1;min-width:0;}
+  .item .body .t1{font-size:14.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item .body .t2{font-size:12px;color:var(--muted);margin-top:2px;}
+  .item .amt{font-family:var(--mono);font-size:14.5px;flex:none;}
+  .item .del{flex:none;background:none;border:none;color:var(--muted);font-size:18px;padding:4px 6px;cursor:pointer;}
+
+  .empty{
+    text-align:center;padding:30px 10px;color:var(--muted);font-size:13.5px;line-height:1.6;
+  }
+
+  /* month picker chips */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none;}
+  .seg-toggle{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:3px;margin-bottom:14px;gap:3px;}
+  .seg-btn{flex:1;background:none;border:none;color:var(--muted);font-size:13px;font-weight:500;padding:9px 0;border-radius:8px;cursor:pointer;}
+  .seg-btn.active{background:var(--gold-soft);color:var(--gold);font-weight:600;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:none;padding:8px 14px;border-radius:100px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);font-size:13px;white-space:nowrap;cursor:pointer;
+  }
+  .chip.active{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);font-weight:600;}
+
+  /* seguimiento table */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table.seg{border-collapse:collapse;width:100%;min-width:760px;font-size:12.5px;}
+  table.seg th, table.seg td{padding:9px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line);}
+  table.seg th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;position:sticky;top:0;background:var(--surface);}
+  table.seg td:first-child, table.seg th:first-child{text-align:left;position:sticky;left:0;background:var(--surface);}
+  table.seg tr:hover td{background:rgba(255,255,255,0.02);}
+  .pos{color:var(--sage);}
+  .neg{color:var(--rust);}
+
+  /* investment cards */
+  .inv-card{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;}
+  .inv-card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .inv-card .head .name{font-weight:600;font-size:14.5px;}
+  .inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:12.5px;}
+  .inv-grid .k{color:var(--muted);}
+  .inv-grid .v{font-family:var(--mono);text-align:right;}
+  .inv-proj{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:baseline;}
+  .inv-proj .lbl{font-size:12px;color:var(--muted);}
+  .inv-proj .num{font-family:var(--serif);font-size:17px;color:var(--gold);font-weight:600;}
+
+  /* cotización en directo */
+  .cotiz-row{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    background:var(--surface);border:1px solid var(--line);border-radius:9px;
+    padding:8px 10px;margin-bottom:10px;font-size:12px;
+  }
+  .cotiz-row.cotiz-pending, .cotiz-row.cotiz-error{color:var(--muted);}
+  .cotiz-ticker{font-family:var(--mono);font-weight:600;color:var(--text);letter-spacing:0.3px;}
+  .cotiz-precio{font-family:var(--mono);font-size:13px;}
+  .cotiz-cambio{font-weight:600;padding:2px 7px;border-radius:100px;font-size:11px;}
+  .cotiz-cambio.pos{background:var(--sage-soft);color:var(--sage);}
+  .cotiz-cambio.neg{background:var(--rust-soft);color:var(--rust);}
+  .cotiz-hora{margin-left:auto;color:var(--muted);font-size:10.5px;}
+
+  /* modal (add gasto / inversion) */
+  .sheet-backdrop{
+    position:fixed;inset:0;background:rgba(6,10,8,0.6);backdrop-filter:blur(2px);
+    display:none;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .sheet-backdrop.open{display:flex;}
+  .sheet{
+    background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;
+    padding:24px 24px calc(24px + env(safe-area-inset-bottom));
+    max-height:90vh;overflow-y:auto;
+    border-top:1px solid var(--line);
+    animation:up .22s ease both;
+  }
+  @keyframes up{from{transform:translateY(24px);opacity:0;}to{transform:none;opacity:1;}}
+  .sheet .handle{width:36px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 16px;}
+  .sheet h3{font-family:var(--serif);font-size:22px;margin:0 0 20px;font-weight:600;}
+
+  /* config list */
+  .kv{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);gap:10px;}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{font-size:13.5px;color:var(--text);}
+  .kv .k .hint{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .kv input{width:110px;text-align:right;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font-family:var(--mono);font-size:13.5px;}
+
+  /* bottom nav */
+  nav.bottom{
+    position:fixed;bottom:0;left:0;right:0;
+    background:rgba(22,36,29,0.92);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    display:flex;justify-content:center;
+    padding-bottom:env(safe-area-inset-bottom);
+    z-index:40;
+  }
+  nav.bottom .inner{max-width:560px;width:100%;display:flex;}
+  nav.bottom button{
+    flex:1;background:none;border:none;color:var(--muted);
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:12px 4px 10px;font-size:11.5px;cursor:pointer;font-weight:500;
+  }
+  nav.bottom button svg{width:24px;height:24px;}
+  nav.bottom button.active{color:var(--gold);}
+  nav.bottom button.active svg{stroke:var(--gold);}
+
+  .fab{
+    position:fixed;right:calc(50% - 280px + 20px);bottom:calc(78px + env(safe-area-inset-bottom) + 14px);
+    width:60px;height:60px;border-radius:50%;background:var(--gold);color:#1B1408;
+    border:none;font-size:32px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 20px rgba(0,0,0,0.35);cursor:pointer;z-index:41;
+  }
+  @media (max-width:600px){
+    .fab{right:20px;}
+  }
+  .fab.hidden{display:none;}
+
+  .toast{
+    position:fixed;top:16px;left:50%;transform:translateX(-50%);
+    background:var(--gold);color:#1B1408;padding:10px 18px;border-radius:100px;
+    font-size:13.5px;font-weight:600;z-index:100;opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(6px);}
+
+  .link-btn{background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;}
+
+  .icon-row{display:flex;justify-content:space-between;gap:10px;margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">bu<em>Z</em>finance</div>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <main>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="view active" id="view-inicio">
+      <div class="hero">
+        <div class="label">Patrimonio total líquido</div>
+        <div class="amount" id="heroPatrimonio">0 €</div>
+        <span class="delta flat" id="heroDelta">— este mes</span>
+      </div>
+
+      <div class="row3">
+        <div class="stat"><div class="k">Cta. corriente</div><div class="v" id="statCorriente">0 €</div></div>
+        <div class="stat"><div class="k">Cta. remunerada</div><div class="v" id="statRemunerada">0 €</div></div>
+        <div class="stat"><div class="k">Inversiones</div><div class="v" id="statInversiones">0 €</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Evolución del patrimonio</h2>
+        <div class="chart-wrap"><canvas id="chartPatrimonio"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2>Gastos de <span id="mesGastoActualLabel"></span></h2>
+        <div class="chart-wrap"><canvas id="chartDonutInicio"></canvas></div>
+        <div class="legend" id="legendInicio"></div>
+      </div>
+    </section>
+
+    <!-- ============ GASTOS ============ -->
+    <section class="view" id="view-gastos">
+      <h1 class="page-title">Gastos</h1>
+      <p class="page-sub">Apunta cada gasto con su categoría — alimentan automáticamente el seguimiento mensual.</p>
+
+      <div class="seg-toggle">
+        <button class="seg-btn active" data-action="periodo-gastos" data-periodo="mes">Por mes</button>
+        <button class="seg-btn" data-action="periodo-gastos" data-periodo="anio">Por año</button>
+      </div>
+
+      <div class="chips" id="mesChips"></div>
+
+      <div class="card">
+        <h2 id="tituloDonutGastos">Por categoría <span style="font-family:var(--sans);font-weight:400;font-size:12.5px;color:var(--muted);" id="totalMesGastos"></span></h2>
+        <div class="chart-wrap"><canvas id="chartDonutGastos"></canvas></div>
+        <div class="legend" id="legendGastos"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="tituloListaGastos">Movimientos</h2>
+        <div class="list" id="listaGastos"></div>
+      </div>
+    </section>
+
+    <!-- ============ SEGUIMIENTO MENSUAL ============ -->
+    <section class="view" id="view-seguimiento">
+      <h1 class="page-title">Seguimiento mensual</h1>
+      <p class="page-sub">Planificación híbrida mes a mes: ingresos, gastos, ahorro e interés compuesto de tu cuenta remunerada.</p>
+
+      <div class="card">
+        <h2>Ahorro líquido remanente</h2>
+        <div class="chart-wrap"><canvas id="chartAhorro"></canvas></div>
+      </div>
+
+      <div class="card" style="padding:0;">
+        <div style="padding:18px 16px 6px;"><h2 style="margin-bottom:2px;">Tabla completa</h2><p class="page-sub" style="margin-bottom:12px;">Desliza para ver todas las columnas. Toca un mes para ajustar sus valores.</p></div>
+        <div class="table-wrap">
+          <table class="seg" id="tablaSeguimiento"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ INVERSIONES ============ -->
+    <section class="view" id="view-inversiones">
+      <h1 class="page-title">Cartera de inversiones</h1>
+      <p class="page-sub">Proyección a interés compuesto de cada producto a 5 años (60 meses).</p>
+
+      <div class="row3" style="grid-template-columns:1fr 1fr;">
+        <div class="stat"><div class="k">Aportado / mes</div><div class="v" id="statAportacionMes">0 €</div></div>
+        <div class="stat"><div class="k">Proyección 5 años</div><div class="v" id="statProy5">0 €</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Crecimiento proyectado (60 meses)</h2>
+        <div class="chart-wrap tall"><canvas id="chartInversion"></canvas></div>
+      </div>
+
+      <h2 style="font-family:var(--serif);font-size:16px;margin:20px 0 4px;display:flex;justify-content:space-between;align-items:center;">
+        Productos
+        <button class="link-btn" data-action="actualizar-cotizaciones" id="btnActualizarCotiz" style="font-size:12.5px;">↻ Actualizar cotizaciones</button>
+      </h2>
+      <p class="page-sub" id="cotizStatus" style="margin-top:0;"></p>
+      <div id="listaInversiones"></div>
+    </section>
+
+    <!-- ============ CONFIGURACIÓN ============ -->
+    <section class="view" id="view-config">
+      <h1 class="page-title">Configuración</h1>
+      <p class="page-sub">Los parámetros iniciales de tu plan financiero.</p>
+
+      <div class="card">
+        <h2>Variables financieras</h2>
+        <div class="kv"><div class="k">Efectivo inicial cta. corriente<span class="hint">Fondo de maniobra diario</span></div><input type="number" id="cfgCaja"></div>
+        <div class="kv"><div class="k">Efectivo inicial cta. remunerada<span class="hint">Colchón con interés compuesto</span></div><input type="number" id="cfgAhorro"></div>
+        <div class="kv"><div class="k">Nómina mensual fija<span class="hint">Ingreso neto recurrente</span></div><input type="number" id="cfgNomina"></div>
+        <div class="kv"><div class="k">Hipoteca mensual fija<span class="hint">Gasto recurrente préstamo</span></div><input type="number" id="cfgHipoteca"></div>
+        <div class="kv"><div class="k">Traspaso fijo a ahorro<span class="hint">Automático a cta. remunerada</span></div><input type="number" id="cfgTraspaso"></div>
+        <div class="kv"><div class="k">TAE cta. remunerada<span class="hint">Anual, ej. 0.03 = 3%</span></div><input type="number" step="0.001" id="cfgTae"></div>
+        <div class="kv"><div class="k">Retención fiscal intereses<span class="hint">Ej. 0.19 = 19%</span></div><input type="number" step="0.01" id="cfgRetencion"></div>
+        <div class="kv"><div class="k">Mes de inicio del plan<span class="hint">YYYY-MM</span></div><input type="month" id="cfgMesInicio" style="width:150px;"></div>
+        <div class="kv"><div class="k">Duración del plan<span class="hint">En meses</span></div><input type="number" id="cfgNumMeses"></div>
+        <button class="btn" style="margin-top:16px;" data-action="guardar-config">Guardar cambios</button>
+      </div>
+
+      <div class="card">
+        <h2>Gasto recurrente por defecto<span style="font-family:var(--sans);font-weight:400;font-size:11.5px;color:var(--muted);">si no hay movimientos</span></h2>
+        <p class="page-sub" style="margin-bottom:12px;">Se usa para estimar un mes en el que aún no has apuntado gastos sueltos.</p>
+        <div id="cfgRecurrentes"></div>
+        <button class="btn" style="margin-top:10px;" data-action="guardar-recurrentes">Guardar recurrentes</button>
+      </div>
+
+      <div class="card">
+        <h2>Categorías</h2>
+        <div class="list" id="listaCategorias"></div>
+        <div class="field-row" style="margin-top:12px;">
+          <input type="text" id="nuevaCategoria" placeholder="Nueva categoría">
+          <button class="btn secondary" data-action="anadir-categoria">Añadir</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Datos</h2>
+        <p class="page-sub">Todo se guarda solo en este dispositivo, en el navegador. Exporta una copia de vez en cuando.</p>
+        <div class="icon-row">
+          <button class="btn secondary small" data-action="exportar">Exportar copia (.json)</button>
+          <button class="btn danger small" data-action="borrar-todo">Borrar todo</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <button class="fab" id="fabAdd" data-action="fab">+</button>
+
+  <nav class="bottom">
+    <div class="inner">
+      <button class="nav-btn active" data-view="inicio" data-action="nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/></svg>
+        Inicio
+      </button>
+      <button class="nav-btn" data-view="gastos" data-action="nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h11l3 4v12H5z"/><path d="M9 10h7M9 14h5"/></svg>
+        Gastos
+      </button>
+      <button class="nav-btn" data-view="seguimiento" data-action="nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="15" rx="1.5"/><path d="M4 10h16M9 5v15"/></svg>
+        Mensual
+      </button>
+      <button class="nav-btn" data-view="inversiones" data-action="nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V9M11 19V4M18 19v-7"/></svg>
+        Invertir
+      </button>
+      <button class="nav-btn" data-view="config" data-action="nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .2 1.2l-2 1.5 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.2-.8.2-1.2Z"/></svg>
+        Ajustes
+      </button>
+    </div>
+  </nav>
+
+</div>
+
+<!-- Sheet: nuevo gasto -->
+<div class="sheet-backdrop" id="sheetGasto">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h3>Nuevo gasto</h3>
+    <div class="field"><label>Descripción</label><input type="text" id="gDescripcion" placeholder="Ej. Supermercado"></div>
+    <div class="field-row">
+      <div class="field"><label>Importe (€)</label><input type="number" step="0.01" id="gImporte" placeholder="0,00"></div>
+      <div class="field"><label>Fecha</label><input type="date" id="gFecha"></div>
+    </div>
+    <div class="field"><label>Categoría</label><select id="gCategoria"></select></div>
+    <button class="btn" data-action="guardar-gasto">Añadir gasto</button>
+    <button class="btn secondary" style="margin-top:10px;" data-action="close-sheet" data-sheet="sheetGasto">Cancelar</button>
+  </div>
+</div>
+
+<!-- Sheet: nueva inversion -->
+<div class="sheet-backdrop" id="sheetInversion">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h3>Nuevo producto</h3>
+    <div class="field"><label>Nombre</label><input type="text" id="iNombre" placeholder="Ej. Fondo indexado MSCI World"></div>
+    <div class="field"><label>Símbolo bursátil (opcional)</label><input type="text" id="iTicker" placeholder="Ej. envx.us, aapl.us, msft.us"></div>
+    <p class="page-sub" style="margin-top:-10px;">Si lo pones, verás su cotización en directo (según disponibilidad de datos). Formato Stooq: ticker + .us para EE.UU., .uk, .de, etc.</p>
+    <div class="field-row">
+      <div class="field"><label>Importe actual (€)</label><input type="number" step="0.01" id="iImporte"></div>
+      <div class="field"><label>Aportación mensual (€)</label><input type="number" step="0.01" id="iAportacion"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Rentabilidad anual est. (%)</label><input type="number" step="0.1" id="iRentabilidad" placeholder="Ej. 7"></div>
+      <div class="field"><label>Precio actual (€)</label><input type="number" step="0.001" id="iPrecio"></div>
+    </div>
+    <button class="btn" data-action="guardar-inversion">Añadir producto</button>
+    <button class="btn secondary" style="margin-top:10px;" data-action="close-sheet" data-sheet="sheetInversion">Cancelar</button>
+  </div>
+</div>
+
+<!-- Sheet: editar mes seguimiento -->
+<div class="sheet-backdrop" id="sheetMes">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h3 id="sheetMesTitulo">Ajustar mes</h3>
+    <p class="page-sub">Deja en blanco para usar el valor por defecto de configuración.</p>
+    <div class="field-row">
+      <div class="field"><label>Nómina (€)</label><input type="number" id="mNomina"></div>
+      <div class="field"><label>Hipoteca (€)</label><input type="number" id="mHipoteca"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Traspaso a ahorro (€)</label><input type="number" id="mTraspaso"></div>
+      <div class="field"><label>Aportación inversión (€)</label><input type="number" id="mAportacion"></div>
+    </div>
+    <div class="field"><label>TAE ese mes (ej. 0.03)</label><input type="number" step="0.001" id="mTae"></div>
+    <button class="btn" data-action="guardar-override-mes">Guardar mes</button>
+    <button class="btn secondary" style="margin-top:10px;" data-action="close-sheet" data-sheet="sheetMes">Cancelar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   BUFINANCE — app de finanzas personales
+   Fusión de "Bufinance.xlsx" (planificación, inversiones, interés compuesto)
+   y "Control_Gastos_Desplegables.xlsx" (registro de gastos por categoría).
+   Toda la información vive en localStorage: es la base de datos del móvil.
+   ========================================================================= */
+
+const DB_KEY = 'bufinance_db_v1';
+const PALETTE = ['#C9A24B','#74A688','#C1573C','#6B8FB0','#B486C1','#D6C46A','#8C9C7C'];
+
+function defaultData(){
+  return {
+    version:1,
+    config:{
+      cajaInicial:5900,
+      ahorroInicial:45627,
+      nominaMensual:2523,
+      hipotecaMensual:574,
+      traspasoAhorro:150,
+      taeDefault:0.03,
+      retencionFiscal:0.19,
+      mesInicio:"2026-09",
+      numMeses:36
+    },
+    categorias:["Comida","Coche / Gasoil","Facturas","Gastos Niños","Ocio","Otros Gastos"],
+    recurrentes:{"Comida":450,"Coche / Gasoil":130,"Facturas":200,"Gastos Niños":150,"Ocio":200,"Otros Gastos":100},
+    gastos:[],
+    inversiones:[
+      {id:uid(),nombre:"Producto 1",importeActual:50,aportacionMensual:50,rentabilidadAnual:0.09,precioActual:58.2},
+      {id:uid(),nombre:"Producto 2",importeActual:50,aportacionMensual:50,rentabilidadAnual:0.07,precioActual:166.66},
+      {id:uid(),nombre:"Producto 3",importeActual:100,aportacionMensual:0,rentabilidadAnual:0.12,precioActual:2.845},
+      {id:uid(),nombre:"Producto 4",importeActual:410,aportacionMensual:10,rentabilidadAnual:0.06,precioActual:26.8},
+      {id:uid(),nombre:"Producto 5",importeActual:60,aportacionMensual:10,rentabilidadAnual:0.06,precioActual:11.694},
+      {id:uid(),nombre:"Producto 6",importeActual:75,aportacionMensual:0,rentabilidadAnual:0.04,precioActual:74.58},
+      {id:uid(),nombre:"Producto 7",importeActual:30,aportacionMensual:0,rentabilidadAnual:0.1,precioActual:74.5}
+    ],
+    taeHistorico:{},
+    overridesMensuales:{}
+  };
+}
+
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+// La variable DB se crea ya inicializada con datos por defecto, y solo DESPUÉS
+// se intenta cargar lo guardado. Así nunca se lee a sí misma a medio construir
+// (ese era el fallo que rompía la app en el primerísimo uso, con el almacenamiento vacío).
+let DB = defaultData();
+cargarDesdeAlmacenamiento();
+
+function cargarDesdeAlmacenamiento(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw){ DB = JSON.parse(raw); return; }
+  }catch(e){ console.warn('No se pudo leer la base de datos local', e); }
+  save();
+}
+function save(d){
+  if(d) DB = d;
+  try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }
+  catch(e){ toast('No se pudo guardar en este navegador'); }
+}
+
+/* ---------------- helpers ---------------- */
+function eur(n){
+  if(n===undefined||n===null||isNaN(n)) n = 0;
+  return n.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+}
+function eur2(n){
+  if(n===undefined||n===null||isNaN(n)) n = 0;
+  return n.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+}
+function monthLabel(ym){
+  const [y,m]=ym.split('-').map(Number);
+  const d = new Date(y, m-1, 1);
+  return d.toLocaleDateString('es-ES',{month:'short',year:'2-digit'}).replace('.','');
+}
+function monthLabelLong(ym){
+  const [y,m]=ym.split('-').map(Number);
+  const d = new Date(y, m-1, 1);
+  const s = d.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function addMonths(ym, n){
+  let [y,m]=ym.split('-').map(Number);
+  m += n;
+  y += Math.floor((m-1)/12);
+  m = ((m-1)%12+12)%12+1;
+  return y+'-'+String(m).padStart(2,'0');
+}
+function ymOf(dateStr){ return dateStr.slice(0,7); }
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+/* ---------------- núcleo de cálculo (motor del seguimiento mensual) ---------------- */
+function computeSeguimiento(){
+  const c = DB.config;
+  const meses = [];
+  let saldoCorriente = c.cajaInicial;
+  let saldoRemunerada = c.ahorroInicial;
+  let lastTae = c.taeDefault;
+
+  for(let i=0;i<c.numMeses;i++){
+    const ym = addMonths(c.mesInicio, i);
+    const ov = DB.overridesMensuales[ym] || {};
+
+    // gastos por categoría: movimientos reales del mes, o recurrente por defecto si no hay ninguno
+    const movimientosMes = DB.gastos.filter(g=>ymOf(g.fecha)===ym);
+    const porCategoria = {};
+    DB.categorias.forEach(cat=>porCategoria[cat]=0);
+    let hayMovimientos = movimientosMes.length>0;
+    movimientosMes.forEach(g=>{ porCategoria[g.categoria] = (porCategoria[g.categoria]||0) + Number(g.importe); });
+    if(!hayMovimientos){
+      DB.categorias.forEach(cat=>{ porCategoria[cat] = DB.recurrentes[cat]!==undefined? DB.recurrentes[cat] : 0; });
+    }
+    const totalGastos = Object.values(porCategoria).reduce((a,b)=>a+b,0);
+
+    const nomina = ov.nomina!==undefined && ov.nomina!==null && ov.nomina!=='' ? Number(ov.nomina) : c.nominaMensual;
+    const hipoteca = ov.hipoteca!==undefined && ov.hipoteca!==null && ov.hipoteca!=='' ? Number(ov.hipoteca) : c.hipotecaMensual;
+    const traspaso = ov.traspaso!==undefined && ov.traspaso!==null && ov.traspaso!=='' ? Number(ov.traspaso) : c.traspasoAhorro;
+    const aportacionInvDefault = DB.inversiones.reduce((s,inv)=>s+Number(inv.aportacionMensual||0),0);
+    const aportacionInv = ov.aportacion!==undefined && ov.aportacion!==null && ov.aportacion!=='' ? Number(ov.aportacion) : aportacionInvDefault;
+
+    const tae = (ov.tae!==undefined && ov.tae!==null && ov.tae!=='') ? Number(ov.tae) : (DB.taeHistorico[ym]!==undefined? DB.taeHistorico[ym] : lastTae);
+    lastTae = tae;
+
+    const capacidadAhorroBruta = nomina - totalGastos - hipoteca;
+    const ahorroLiquidoRemanente = capacidadAhorroBruta - aportacionInv - traspaso;
+
+    const interesBruto = saldoRemunerada * (tae/12);
+    const retencion = interesBruto * c.retencionFiscal;
+    const interesNeto = interesBruto - retencion;
+
+    saldoCorriente = saldoCorriente + ahorroLiquidoRemanente;
+    saldoRemunerada = saldoRemunerada + traspaso + interesNeto;
+
+    meses.push({
+      ym, nomina, porCategoria, totalGastos, hipoteca,
+      capacidadAhorroBruta, aportacionInv, traspaso, ahorroLiquidoRemanente,
+      tae, interesBruto, retencion, interesNeto,
+      saldoCorriente, saldoRemunerada,
+      hayMovimientos
+    });
+  }
+  return meses;
+}
+
+function computeInversiones(){
+  // valor acumulado de la cartera mes a mes (60 meses fijos para gráfico de proyección)
+  const horizonte = 60;
+  const productos = DB.inversiones.map(inv=>{
+    const r = Number(inv.rentabilidadAnual)/12;
+    let valores = [Number(inv.importeActual)];
+    for(let i=1;i<=horizonte;i++){
+      const prev = valores[i-1];
+      valores.push(prev*(1+r) + Number(inv.aportacionMensual||0));
+    }
+    return {...inv, serie:valores, proyeccion5:valores[horizonte]};
+  });
+  const totalHoy = productos.reduce((s,p)=>s+Number(p.importeActual),0);
+  const totalAportacionMes = productos.reduce((s,p)=>s+Number(p.aportacionMensual||0),0);
+  const totalProy5 = productos.reduce((s,p)=>s+p.proyeccion5,0);
+  const serieTotal = [];
+  for(let i=0;i<=horizonte;i++){
+    serieTotal.push(productos.reduce((s,p)=>s+p.serie[i],0));
+  }
+  return {productos, totalHoy, totalAportacionMes, totalProy5, serieTotal};
+}
+
+function valorCarteraEnMes(i){
+  // usado para sumar valor de inversiones al patrimonio total en el mes i del seguimiento
+  const inv = computeInversiones();
+  return inv.serieTotal[Math.min(i, inv.serieTotal.length-1)];
+}
+
+/* ---------------- estado UI ---------------- */
+let vistaActual = 'inicio';
+let mesGastoSeleccionado = null;
+let charts = {};
+
+function cambiarVista(v){
+  vistaActual = v;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
+  document.getElementById('fabAdd').classList.toggle('hidden', !(v==='gastos'||v==='inversiones'));
+  // la vista ya ha cambiado en el DOM en este punto; si el render de contenido
+  // (tablas/gráficos) falla por cualquier motivo, la navegación no debe romperse.
+  try{ renderVista(v); }
+  catch(err){ console.error('Error al renderizar la vista', v, err); }
+}
+
+function abrirSheetSegunVista(){
+  if(vistaActual==='gastos') abrirSheetGasto();
+  else if(vistaActual==='inversiones') abrirSheetInversion();
+}
+
+function renderVista(v){
+  if(v==='inicio') renderInicio();
+  if(v==='gastos') renderGastos();
+  if(v==='seguimiento') renderSeguimiento();
+  if(v==='inversiones') renderInversiones();
+  if(v==='config') renderConfig();
+}
+
+/* ---------------- INICIO ---------------- */
+function renderInicio(){
+  const meses = computeSeguimiento();
+  const inv = computeInversiones();
+  const hoy = new Date();
+  const ymHoy = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0');
+  let idx = meses.findIndex(m=>m.ym===ymHoy);
+  if(idx===-1) idx = meses.length-1;
+  const actual = meses[idx];
+  const anterior = idx>0? meses[idx-1] : null;
+
+  const valorInv = valorCarteraEnMes(idx);
+  const patrimonio = actual.saldoCorriente + actual.saldoRemunerada + valorInv;
+  const patrimonioAnterior = anterior ? (anterior.saldoCorriente + anterior.saldoRemunerada + valorCarteraEnMes(idx-1)) : patrimonio;
+  const delta = patrimonio - patrimonioAnterior;
+
+  document.getElementById('heroPatrimonio').textContent = eur(patrimonio);
+  const deltaEl = document.getElementById('heroDelta');
+  if(Math.abs(delta)<1){ deltaEl.className='delta flat'; deltaEl.textContent='Sin cambios este mes'; }
+  else if(delta>0){ deltaEl.className='delta up'; deltaEl.textContent='↑ '+eur(delta)+' este mes'; }
+  else { deltaEl.className='delta down'; deltaEl.textContent='↓ '+eur(Math.abs(delta))+' este mes'; }
+
+  document.getElementById('statCorriente').textContent = eur(actual.saldoCorriente);
+  document.getElementById('statRemunerada').textContent = eur(actual.saldoRemunerada);
+  document.getElementById('statInversiones').textContent = eur(valorInv);
+  document.getElementById('mesGastoActualLabel').textContent = monthLabelLong(actual.ym).toLowerCase();
+
+  // chart patrimonio evolution
+  const labels = meses.map(m=>monthLabel(m.ym));
+  const dataPatrimonio = meses.map((m,i)=>m.saldoCorriente+m.saldoRemunerada+valorCarteraEnMes(i));
+  drawLine('chartPatrimonio', labels, [{label:'Patrimonio', data:dataPatrimonio, color:'#C9A24B'}]);
+
+  // donut gastos mes actual
+  drawDonutFromCategorias('chartDonutInicio','legendInicio', actual.porCategoria);
+}
+
+/* ---------------- GASTOS ---------------- */
+let periodoGastos = 'mes'; // 'mes' | 'anio'
+let anioGastoSeleccionado = null;
+
+function renderChipsMeses(){
+  const meses = computeSeguimiento();
+  const cont = document.getElementById('mesChips');
+  if(!mesGastoSeleccionado){
+    const hoy = new Date();
+    const ymHoy = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0');
+    mesGastoSeleccionado = meses.find(m=>m.ym===ymHoy)? ymHoy : meses[0].ym;
+  }
+  cont.innerHTML = meses.map(m=>`<div class="chip ${m.ym===mesGastoSeleccionado?'active':''}" data-ym="${m.ym}">${monthLabel(m.ym)}</div>`).join('');
+  cont.querySelectorAll('.chip').forEach(ch=>{
+    ch.onclick = ()=>{ mesGastoSeleccionado = ch.dataset.ym; renderGastos(); };
+  });
+}
+
+function renderChipsAnios(){
+  const meses = computeSeguimiento();
+  const anios = [...new Set(meses.map(m=>m.ym.slice(0,4)))];
+  const cont = document.getElementById('mesChips');
+  if(!anioGastoSeleccionado || !anios.includes(anioGastoSeleccionado)){
+    const anioHoy = String(new Date().getFullYear());
+    anioGastoSeleccionado = anios.includes(anioHoy)? anioHoy : anios[0];
+  }
+  cont.innerHTML = anios.map(a=>`<div class="chip ${a===anioGastoSeleccionado?'active':''}" data-anio="${a}">${a}</div>`).join('');
+  cont.querySelectorAll('.chip').forEach(ch=>{
+    ch.onclick = ()=>{ anioGastoSeleccionado = ch.dataset.anio; renderGastos(); };
+  });
+}
+
+function cambiarPeriodoGastos(periodo){
+  periodoGastos = periodo;
+  document.querySelectorAll('.seg-btn[data-action="periodo-gastos"]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.periodo===periodo);
+  });
+  renderGastos();
+}
+
+function renderGastos(){
+  if(periodoGastos==='anio'){ renderGastosAnio(); return; }
+  renderGastosMes();
+}
+
+function renderGastosMes(){
+  renderChipsMeses();
+  const meses = computeSeguimiento();
+  const m = meses.find(x=>x.ym===mesGastoSeleccionado) || meses[0];
+
+  document.getElementById('tituloDonutGastos').firstChild.textContent = 'Por categoría ';
+  document.getElementById('tituloListaGastos').textContent = 'Movimientos';
+  document.getElementById('totalMesGastos').textContent = '· '+eur2(m.totalGastos)+(m.hayMovimientos? '' : ' (estimado)');
+  drawDonutFromCategorias('chartDonutGastos','legendGastos', m.porCategoria);
+
+  const movimientos = DB.gastos.filter(g=>ymOf(g.fecha)===m.ym).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const cont = document.getElementById('listaGastos');
+  if(movimientos.length===0){
+    cont.innerHTML = `<div class="empty">Todavía no has apuntado gastos en ${monthLabelLong(m.ym).toLowerCase()}.<br>Se está usando tu estimación recurrente por categoría.<br><br><button class="link-btn" data-action="open-sheet-gasto">Añadir el primero →</button></div>`;
+    return;
+  }
+  cont.innerHTML = movimientos.map(g=>{
+    const idxCat = DB.categorias.indexOf(g.categoria);
+    const color = PALETTE[idxCat<0?0:idxCat % PALETTE.length];
+    const fecha = new Date(g.fecha+'T00:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
+    return `<div class="item">
+      <div class="swatch" style="background:${color}"></div>
+      <div class="body"><div class="t1">${escapeHtml(g.descripcion||g.categoria)}</div><div class="t2">${fecha} · ${g.categoria}</div></div>
+      <div class="amt">${eur2(g.importe)}</div>
+      <button class="del" data-action="borrar-gasto" data-id="${g.id}">×</button>
+    </div>`;
+  }).join('');
+}
+
+function renderGastosAnio(){
+  renderChipsAnios();
+  const meses = computeSeguimiento();
+  const mesesAnio = meses.filter(m=>m.ym.startsWith(anioGastoSeleccionado));
+
+  const agregada = {};
+  DB.categorias.forEach(c=>agregada[c]=0);
+  let totalAnio = 0;
+  mesesAnio.forEach(m=>{
+    DB.categorias.forEach(c=>{ agregada[c] += (m.porCategoria[c]||0); });
+    totalAnio += m.totalGastos;
+  });
+
+  document.getElementById('tituloDonutGastos').firstChild.textContent = 'Por categoría ';
+  document.getElementById('tituloListaGastos').textContent = 'Desglose por mes';
+  document.getElementById('totalMesGastos').textContent = '· '+eur2(totalAnio)+' en '+anioGastoSeleccionado;
+  drawDonutFromCategorias('chartDonutGastos','legendGastos', agregada);
+
+  const cont = document.getElementById('listaGastos');
+  if(mesesAnio.length===0){
+    cont.innerHTML = `<div class="empty">Sin datos para ${anioGastoSeleccionado}.</div>`;
+    return;
+  }
+  const maxMes = Math.max(...mesesAnio.map(m=>m.totalGastos), 1);
+  cont.innerHTML = mesesAnio.map(m=>{
+    const pct = Math.max((m.totalGastos/maxMes)*100, 3);
+    return `<div class="item">
+      <div class="swatch" style="background:var(--gold)"></div>
+      <div class="body">
+        <div class="t1">${monthLabelLong(m.ym)}</div>
+        <div class="t2">${m.hayMovimientos? 'con movimientos apuntados' : 'estimado (recurrente)'}</div>
+        <div style="background:var(--line);border-radius:4px;height:4px;margin-top:6px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:var(--gold);"></div></div>
+      </div>
+      <div class="amt">${eur2(m.totalGastos)}</div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function borrarGasto(id){
+  DB.gastos = DB.gastos.filter(g=>g.id!==id);
+  save();
+  renderGastos();
+  toast('Gasto eliminado');
+}
+
+/* ---------------- SEGUIMIENTO ---------------- */
+function renderSeguimiento(){
+  const meses = computeSeguimiento();
+  const labels = meses.map(m=>monthLabel(m.ym));
+  drawLine('chartAhorro', labels, [{label:'Ahorro líquido remanente', data: meses.map(m=>m.ahorroLiquidoRemanente), color:'#74A688'}]);
+
+  const cols = ['Mes','Nómina','Comida','Coche','Facturas','Niños','Ocio','Otros','Hipoteca','Ahorro bruto','Traspaso','Interés neto','Cta. corriente','Cta. remunerada'];
+  let html = '<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  meses.forEach(m=>{
+    const p = m.porCategoria;
+    html += `<tr data-action="abrir-sheet-mes" data-ym="${m.ym}">
+      <td>${monthLabel(m.ym)}</td>
+      <td>${fmt(m.nomina)}</td>
+      <td>${fmt(p['Comida'])}</td>
+      <td>${fmt(p['Coche / Gasoil'])}</td>
+      <td>${fmt(p['Facturas'])}</td>
+      <td>${fmt(p['Gastos Niños'])}</td>
+      <td>${fmt(p['Ocio'])}</td>
+      <td>${fmt(p['Otros Gastos'])}</td>
+      <td>${fmt(m.hipoteca)}</td>
+      <td class="${m.capacidadAhorroBruta>=0?'pos':'neg'}">${fmt(m.capacidadAhorroBruta)}</td>
+      <td>${fmt(m.traspaso)}</td>
+      <td class="pos">${fmt(m.interesNeto,2)}</td>
+      <td>${fmt(m.saldoCorriente)}</td>
+      <td>${fmt(m.saldoRemunerada)}</td>
+    </tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('tablaSeguimiento').innerHTML = html;
+}
+function fmt(n,dec){ if(n===undefined) n=0; return n.toLocaleString('es-ES',{maximumFractionDigits:dec!==undefined?dec:0}); }
+
+let mesSheetActual = null;
+function abrirSheetMes(ym){
+  mesSheetActual = ym;
+  const ov = DB.overridesMensuales[ym] || {};
+  document.getElementById('sheetMesTitulo').textContent = 'Ajustar '+monthLabelLong(ym).toLowerCase();
+  document.getElementById('mNomina').value = ov.nomina ?? '';
+  document.getElementById('mHipoteca').value = ov.hipoteca ?? '';
+  document.getElementById('mTraspaso').value = ov.traspaso ?? '';
+  document.getElementById('mAportacion').value = ov.aportacion ?? '';
+  document.getElementById('mTae').value = ov.tae ?? '';
+  abrirSheet('sheetMes');
+}
+function guardarOverrideMes(){
+  const val = id=>{ const v=document.getElementById(id).value; return v===''? undefined : Number(v); };
+  const ov = {
+    nomina: val('mNomina'), hipoteca: val('mHipoteca'),
+    traspaso: val('mTraspaso'), aportacion: val('mAportacion'), tae: val('mTae')
+  };
+  Object.keys(ov).forEach(k=>{ if(ov[k]===undefined) delete ov[k]; });
+  if(Object.keys(ov).length===0){ delete DB.overridesMensuales[mesSheetActual]; }
+  else { DB.overridesMensuales[mesSheetActual] = ov; }
+  save();
+  cerrarSheet('sheetMes');
+  renderSeguimiento();
+  toast('Mes actualizado');
+}
+
+/* ---------------- INVERSIONES ---------------- */
+function renderInversiones(){
+  const inv = computeInversiones();
+  document.getElementById('statAportacionMes').textContent = eur(inv.totalAportacionMes);
+  document.getElementById('statProy5').textContent = eur(inv.totalProy5);
+
+  const labels = Array.from({length:61},(_,i)=>i%12===0? (i/12)+'a' : '');
+  drawLine('chartInversion', labels, [{label:'Valor cartera', data: inv.serieTotal, color:'#C9A24B', fill:true}]);
+
+  const cont = document.getElementById('listaInversiones');
+  if(inv.productos.length===0){
+    cont.innerHTML = `<div class="empty">Aún no tienes productos.<br><button class="link-btn" data-action="open-sheet-inversion">Añadir el primero →</button></div>`;
+    return;
+  }
+  cont.innerHTML = inv.productos.map(p=>`
+    <div class="inv-card">
+      <div class="head">
+        <div class="name">${escapeHtml(p.nombre)}</div>
+        <button class="del" data-action="borrar-inversion" data-id="${p.id}">×</button>
+      </div>
+      ${renderCotizacionHtml(p)}
+      <div class="inv-grid">
+        <div class="k">Importe actual</div><div class="v">${eur2(p.importeActual)}</div>
+        <div class="k">Aportación / mes</div><div class="v">${eur2(p.aportacionMensual)}</div>
+        <div class="k">Rentabilidad anual</div><div class="v">${(p.rentabilidadAnual*100).toFixed(1)}%</div>
+        <div class="k">Precio de referencia</div><div class="v">${eur2(p.precioActual)}</div>
+      </div>
+      <div class="inv-proj"><div class="lbl">Proyección a 5 años</div><div class="num">${eur(p.proyeccion5)}</div></div>
+    </div>
+  `).join('');
+
+  // primera vez que se ve esta pestaña en la sesión: intenta traer cotizaciones solo,
+  // sin bloquear el resto de la vista (mejor esfuerzo, silencioso si falla).
+  const hayTickers = DB.inversiones.some(p=>p.ticker);
+  if(hayTickers && !renderInversiones._autoFetched && navigator.onLine){
+    renderInversiones._autoFetched = true;
+    actualizarCotizaciones();
+  }
+}
+function renderCotizacionHtml(p){
+  if(!p.ticker) return '';
+  const live = p.liveData;
+  if(!live){
+    return `<div class="cotiz-row cotiz-pending">📡 ${escapeHtml(p.ticker.toUpperCase())} · sin cotización aún</div>`;
+  }
+  if(live.error){
+    return `<div class="cotiz-row cotiz-error">⚠️ ${escapeHtml(p.ticker.toUpperCase())}: no se pudo obtener (${escapeHtml(live.error)})</div>`;
+  }
+  const cambio = p.precioActual>0 ? ((live.precio - p.precioActual)/p.precioActual*100) : null;
+  const signo = cambio===null? '' : (cambio>=0?'▲ +':'▼ ');
+  const clase = cambio===null? '' : (cambio>=0?'pos':'neg');
+  return `<div class="cotiz-row">
+    <span class="cotiz-ticker">${escapeHtml(p.ticker.toUpperCase())}</span>
+    <span class="cotiz-precio">${live.precio.toLocaleString('es-ES',{maximumFractionDigits:3})}</span>
+    ${cambio!==null? `<span class="cotiz-cambio ${clase}">${signo}${Math.abs(cambio).toFixed(2)}% vs. tu ref.</span>` : ''}
+    <span class="cotiz-hora">actualizado ${live.hora}</span>
+  </div>`;
+}
+async function actualizarCotizaciones(){
+  const conTicker = DB.inversiones.filter(p=>p.ticker);
+  const statusEl = document.getElementById('cotizStatus');
+  if(conTicker.length===0){
+    if(statusEl) statusEl.textContent = 'Añade un símbolo bursátil a un producto (editar próximamente, o crea uno nuevo) para ver su cotización en directo.';
+    return;
+  }
+  if(!navigator.onLine){
+    if(statusEl) statusEl.textContent = 'Sin conexión a internet — no se puede consultar la cotización ahora.';
+    return;
+  }
+  const btn = document.getElementById('btnActualizarCotiz');
+  if(btn) btn.textContent = '↻ Actualizando…';
+  if(statusEl) statusEl.textContent = 'Consultando cotizaciones en directo…';
+
+  await Promise.all(conTicker.map(async (p)=>{
+    try{
+      const q = await fetchCotizacion(p.ticker);
+      p.liveData = {precio:q.precio, hora:q.hora, error:null};
+    }catch(err){
+      p.liveData = {error: err.message || 'error de red'};
+    }
+  }));
+  save();
+  if(btn) btn.textContent = '↻ Actualizar cotizaciones';
+  if(statusEl) statusEl.textContent = 'Última actualización: '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'. Datos vía Stooq, con retardo — no son para operar en bolsa.';
+  renderInversiones();
+}
+async function fetchCotizacion(ticker){
+  // Stooq ofrece cotizaciones gratuitas sin necesidad de clave de API, en formato CSV.
+  // El formato de símbolo suele ser "ticker.mercado", ej: envx.us, aapl.us, sap.de
+  const url = 'https://stooq.com/q/l/?s='+encodeURIComponent(ticker)+'&f=sd2t2c2&h&e=csv';
+  const res = await fetch(url, {mode:'cors', cache:'no-store'});
+  if(!res.ok) throw new Error('sin respuesta del servicio');
+  const texto = await res.text();
+  const filas = texto.trim().split('\n');
+  if(filas.length<2) throw new Error('símbolo no encontrado');
+  const cols = filas[1].split(',');
+  const precio = parseFloat(cols[3]);
+  const hora = cols[2] || '';
+  if(!isFinite(precio) || precio<=0) throw new Error('símbolo no encontrado');
+  return {precio, hora};
+}
+function borrarInversion(id){
+  DB.inversiones = DB.inversiones.filter(i=>i.id!==id);
+  save();
+  renderInversiones();
+  toast('Producto eliminado');
+}
+
+/* ---------------- CONFIG ---------------- */
+function renderConfig(){
+  const c = DB.config;
+  document.getElementById('cfgCaja').value = c.cajaInicial;
+  document.getElementById('cfgAhorro').value = c.ahorroInicial;
+  document.getElementById('cfgNomina').value = c.nominaMensual;
+  document.getElementById('cfgHipoteca').value = c.hipotecaMensual;
+  document.getElementById('cfgTraspaso').value = c.traspasoAhorro;
+  document.getElementById('cfgTae').value = c.taeDefault;
+  document.getElementById('cfgRetencion').value = c.retencionFiscal;
+  document.getElementById('cfgMesInicio').value = c.mesInicio;
+  document.getElementById('cfgNumMeses').value = c.numMeses;
+
+  document.getElementById('cfgRecurrentes').innerHTML = DB.categorias.map(cat=>`
+    <div class="kv"><div class="k">${escapeHtml(cat)}</div><input type="number" step="0.01" data-cat="${escapeHtml(cat)}" class="recInput" value="${DB.recurrentes[cat] ?? 0}"></div>
+  `).join('');
+
+  document.getElementById('listaCategorias').innerHTML = DB.categorias.map(cat=>`
+    <div class="item"><div class="body t1" style="flex:1;">${escapeHtml(cat)}</div><button class="del" data-action="borrar-categoria" data-cat="${escapeHtml(cat)}">×</button></div>
+  `).join('');
+}
+function guardarConfig(){
+  const c = DB.config;
+  c.cajaInicial = Number(document.getElementById('cfgCaja').value)||0;
+  c.ahorroInicial = Number(document.getElementById('cfgAhorro').value)||0;
+  c.nominaMensual = Number(document.getElementById('cfgNomina').value)||0;
+  c.hipotecaMensual = Number(document.getElementById('cfgHipoteca').value)||0;
+  c.traspasoAhorro = Number(document.getElementById('cfgTraspaso').value)||0;
+  c.taeDefault = Number(document.getElementById('cfgTae').value)||0;
+  c.retencionFiscal = Number(document.getElementById('cfgRetencion').value)||0;
+  c.mesInicio = document.getElementById('cfgMesInicio').value || c.mesInicio;
+  c.numMeses = Number(document.getElementById('cfgNumMeses').value)||36;
+  save();
+  toast('Configuración guardada');
+}
+function guardarRecurrentes(){
+  document.querySelectorAll('.recInput').forEach(inp=>{
+    DB.recurrentes[inp.dataset.cat] = Number(inp.value)||0;
+  });
+  save();
+  toast('Recurrentes guardados');
+}
+function anadirCategoria(){
+  const inp = document.getElementById('nuevaCategoria');
+  const v = inp.value.trim();
+  if(!v) return;
+  if(DB.categorias.includes(v)){ toast('Esa categoría ya existe'); return; }
+  DB.categorias.push(v);
+  DB.recurrentes[v] = 0;
+  save();
+  inp.value='';
+  renderConfig();
+  toast('Categoría añadida');
+}
+function borrarCategoria(cat){
+  DB.categorias = DB.categorias.filter(c=>c!==cat);
+  delete DB.recurrentes[cat];
+  save();
+  renderConfig();
+}
+function exportarDatos(){
+  const blob = new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'bufinance_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function borrarTodo(){
+  if(!confirm('Esto borra todos tus datos guardados en este dispositivo. ¿Seguro?')) return;
+  DB = defaultData();
+  save();
+  renderVista(vistaActual);
+  toast('Datos reiniciados');
+}
+
+/* ---------------- sheets (modales) ---------------- */
+function abrirSheet(id){ document.getElementById(id).classList.add('open'); }
+function cerrarSheet(id){ document.getElementById(id).classList.remove('open'); }
+
+function abrirSheetGasto(){
+  const sel = document.getElementById('gCategoria');
+  sel.innerHTML = DB.categorias.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  document.getElementById('gDescripcion').value='';
+  document.getElementById('gImporte').value='';
+  document.getElementById('gFecha').value = new Date().toISOString().slice(0,10);
+  abrirSheet('sheetGasto');
+}
+function guardarGasto(){
+  const importe = Number(document.getElementById('gImporte').value);
+  const fecha = document.getElementById('gFecha').value;
+  const categoria = document.getElementById('gCategoria').value;
+  const descripcion = document.getElementById('gDescripcion').value.trim();
+  
+  if(!fecha){ toast('Por favor selecciona una fecha'); return; }
+  if(!importe || importe <= 0){ toast('Por favor ingresa un importe mayor a 0'); return; }
+  if(!categoria){ toast('Por favor selecciona una categoría'); return; }
+  
+  DB.gastos.push({id:uid(), fecha, categoria, importe, descripcion});
+  save();
+  cerrarSheet('sheetGasto');
+  mesGastoSeleccionado = ymOf(fecha);
+  renderGastos();
+  renderInicio();
+  toast('✓ Gasto añadido');
+}
+
+function abrirSheetInversion(){
+  ['iNombre','iTicker','iImporte','iAportacion','iRentabilidad','iPrecio'].forEach(id=>document.getElementById(id).value='');
+  abrirSheet('sheetInversion');
+}
+function guardarInversion(){
+  const nombre = document.getElementById('iNombre').value.trim() || 'Nuevo producto';
+  const ticker = document.getElementById('iTicker').value.trim().toLowerCase();
+  const importeActual = Number(document.getElementById('iImporte').value)||0;
+  const aportacionMensual = Number(document.getElementById('iAportacion').value)||0;
+  const rentabilidadAnual = (Number(document.getElementById('iRentabilidad').value)||0)/100;
+  const precioActual = Number(document.getElementById('iPrecio').value)||0;
+  DB.inversiones.push({id:uid(), nombre, ticker, importeActual, aportacionMensual, rentabilidadAnual, precioActual});
+  save();
+  cerrarSheet('sheetInversion');
+  renderInversiones();
+  toast('Producto añadido');
+}
+
+/* ---------------- gráficos (Canvas nativo, sin dependencias externas) ---------------- */
+function prepararCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(rect.width, 10);
+  const h = Math.max(rect.height, 10);
+  canvas.width = w*dpr;
+  canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  return {ctx,w,h};
+}
+function abreviarEur(v){
+  const signo = v<0? '-':'';
+  const abs = Math.abs(v);
+  if(abs>=1000) return signo+(abs/1000).toFixed(abs>=10000?0:1).replace('.0','')+'k';
+  return signo+Math.round(abs);
+}
+// recuerda la última serie dibujada en cada canvas, para poder redibujar al rotar o cambiar tamaño
+const chartState = {};
+
+function drawLine(canvasId, labels, series){
+  chartState[canvasId] = {type:'line', labels, series};
+  renderLineNow(canvasId);
+}
+function renderLineNow(canvasId){
+  const st = chartState[canvasId];
+  if(!st) return;
+  const {labels, series} = st;
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const {ctx,w,h} = prepararCanvas(canvas);
+  const s = series[0];
+  const data = s.data.length? s.data : [0];
+  const pad = {top:14, right:10, bottom:20, left:44};
+  const plotW = Math.max(w-pad.left-pad.right, 10);
+  const plotH = Math.max(h-pad.top-pad.bottom, 10);
+  let max = Math.max(...data), min = Math.min(...data,0);
+  if(max===min){ max = min+1; }
+  const range = max-min;
+
+  // líneas guía horizontales + etiquetas
+  ctx.strokeStyle='rgba(237,234,224,0.07)';
+  ctx.fillStyle='#93A199';
+  ctx.font='10px "IBM Plex Sans", sans-serif';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  const pasos=3;
+  for(let i=0;i<=pasos;i++){
+    const val = min + range*i/pasos;
+    const y = pad.top + plotH - (plotH*i/pasos);
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(w-pad.right,y); ctx.stroke();
+    ctx.fillText(abreviarEur(val), pad.left-6, y);
+  }
+
+  // etiquetas eje X (unas pocas, repartidas)
+  const n = data.length;
+  const maxEtiquetas = 6;
+  const cada = Math.max(1, Math.ceil(n/maxEtiquetas));
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  labels.forEach((lab,i)=>{
+    if(!lab) return;
+    if(i%cada!==0 && i!==n-1) return;
+    const x = pad.left + plotW*(n>1? i/(n-1) : 0.5);
+    ctx.fillText(lab, x, h-pad.bottom+5);
+  });
+
+  const pts = data.map((v,i)=>({
+    x: pad.left + plotW*(n>1? i/(n-1) : 0.5),
+    y: pad.top + plotH - ((v-min)/range)*plotH
+  }));
+
+  if(s.fill){
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pad.top+plotH);
+    pts.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.lineTo(pts[pts.length-1].x, pad.top+plotH);
+    ctx.closePath();
+    ctx.fillStyle = s.color+'26';
+    ctx.fill();
+  }
+  ctx.beginPath();
+  pts.forEach((p,i)=> i===0? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle = s.color; ctx.lineWidth=2.4; ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.stroke();
+
+  // punto final destacado
+  const last = pts[pts.length-1];
+  ctx.beginPath(); ctx.arc(last.x,last.y,3.5,0,Math.PI*2);
+  ctx.fillStyle = s.color; ctx.fill();
+}
+
+function drawDonutFromCategorias(canvasId, legendId, porCategoria){
+  const labels = DB.categorias;
+  const data = labels.map(l=>porCategoria[l]||0);
+  const total = data.reduce((a,b)=>a+b,0);
+  const colors = labels.map((_,i)=>PALETTE[i%PALETTE.length]);
+  chartState[canvasId] = {type:'donut', data, colors};
+  renderDonutNow(canvasId);
+
+  const legend = document.getElementById(legendId);
+  if(!legend) return;
+  if(total===0){
+    legend.innerHTML = '<div class="empty" style="padding:6px;">Sin gastos registrados en este periodo.</div>';
+    return;
+  }
+  legend.innerHTML = labels.map((l,i)=>`
+    <div class="legend-row"><div class="dot" style="background:${colors[i]}"></div>
+      <div class="name">${escapeHtml(l)}</div><div class="val">${eur2(data[i])}</div>
+    </div>`).join('');
+}
+function renderDonutNow(canvasId){
+  const st = chartState[canvasId];
+  if(!st) return;
+  const {data, colors} = st;
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const {ctx,w,h} = prepararCanvas(canvas);
+  const total = data.reduce((a,b)=>a+b,0);
+  const cx=w/2, cy=h/2, radius=Math.max(Math.min(w,h)/2-4,10);
+  const inner = radius*0.64;
+  if(total<=0){
+    ctx.strokeStyle='rgba(237,234,224,0.10)'; ctx.lineWidth=radius-inner;
+    ctx.beginPath(); ctx.arc(cx,cy,(radius+inner)/2,0,Math.PI*2); ctx.stroke();
+    return;
+  }
+  let start=-Math.PI/2;
+  data.forEach((v,i)=>{
+    if(v<=0) return;
+    const angle = (v/total)*Math.PI*2;
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,start,start+angle);
+    ctx.arc(cx,cy,inner,start+angle,start,true);
+    ctx.closePath();
+    ctx.fillStyle=colors[i];
+    ctx.fill();
+    start+=angle;
+  });
+  ctx.fillStyle='#EDEAE0';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='600 15px "Fraunces", serif';
+  ctx.fillText(eur(total), cx, cy-6);
+  ctx.font='11px "IBM Plex Sans", sans-serif';
+  ctx.fillStyle='#93A199';
+  ctx.fillText('total', cx, cy+13);
+}
+
+// redibuja los gráficos visibles al rotar la pantalla o cambiar de tamaño
+let resizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{
+    Object.keys(chartState).forEach(id=>{
+      const st = chartState[id];
+      if(st.type==='line') renderLineNow(id);
+      if(st.type==='donut') renderDonutNow(id);
+    });
+  }, 120);
+});
+
+/* ---------------- init ---------------- */
+function initFechaHeader(){
+  const hoy = new Date();
+  document.getElementById('todayLabel').textContent = hoy.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+}
+
+function detectarVisorRestringido(){
+  // Si el visor ignora el <meta viewport> (típico de vistas previas de adjuntos
+  // dentro de Gmail/apps de correo), el ancho "lógico" de la página será muy
+  // grande aunque el dispositivo sea un móvil. En ese caso mostramos un aviso.
+  const anchoLogico = document.documentElement.clientWidth;
+  if(anchoLogico > 650){
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;inset:0;background:#0F1B16;z-index:999;display:flex;align-items:center;justify-content:center;padding:30px;text-align:center;font-family:sans-serif;color:#EDEAE0;';
+    banner.innerHTML = `<div style="max-width:420px;">
+      <div style="font-size:38px;margin-bottom:14px;">⚠️</div>
+      <div style="font-size:19px;font-weight:600;margin-bottom:10px;">Se ha abierto en modo vista previa</div>
+      <div style="font-size:15px;line-height:1.6;color:#C7CFC9;">Parece que estás viendo este archivo dentro de una vista previa (Gmail, un gestor de archivos u otra app), que restringe cómo se muestran las páginas.<br><br>
+      Para que funcione al 100%: guarda el archivo en tu almacenamiento (Descargas), ábrelo con la app <b>Archivos</b> y elige <b>Chrome</b> como aplicación para abrirlo.</div>
+      <button onclick="this.closest('div').parentElement.remove()" style="margin-top:20px;background:#C9A24B;color:#1B1408;border:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">Continuar de todos modos</button>
+    </div>`;
+    document.body.appendChild(banner);
+  }
+}
+
+document.querySelectorAll('.sheet-backdrop').forEach(bd=>{
+  bd.addEventListener('click', (e)=>{ if(e.target===bd) bd.classList.remove('open'); });
+});
+
+/* Toda la interactividad pasa por este único listener delegado (data-action="..."),
+   en vez de atributos onclick="" sueltos por el HTML: algunos navegadores/apps de
+   Android bloquean los manejadores de eventos inline por seguridad aunque sí
+   ejecuten el <script> normal, y esto evita depender de eso. */
+document.addEventListener('click', function(e){
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const action = el.dataset.action;
+  try{
+    switch(action){
+      case 'nav': cambiarVista(el.dataset.view); break;
+      case 'fab': abrirSheetSegunVista(); break;
+      case 'open-sheet-gasto': abrirSheetGasto(); break;
+      case 'open-sheet-inversion': abrirSheetInversion(); break;
+      case 'close-sheet': cerrarSheet(el.dataset.sheet); break;
+      case 'guardar-gasto': guardarGasto(); break;
+      case 'guardar-inversion': guardarInversion(); break;
+      case 'guardar-config': guardarConfig(); break;
+      case 'guardar-recurrentes': guardarRecurrentes(); break;
+      case 'anadir-categoria': anadirCategoria(); break;
+      case 'exportar': exportarDatos(); break;
+      case 'borrar-todo': borrarTodo(); break;
+      case 'borrar-gasto': borrarGasto(el.dataset.id); break;
+      case 'borrar-inversion': borrarInversion(el.dataset.id); break;
+      case 'borrar-categoria': borrarCategoria(el.dataset.cat); break;
+      case 'abrir-sheet-mes': abrirSheetMes(el.dataset.ym); break;
+      case 'guardar-override-mes': guardarOverrideMes(); break;
+      case 'actualizar-cotizaciones': actualizarCotizaciones(); break;
+      case 'periodo-gastos': cambiarPeriodoGastos(el.dataset.periodo); break;
+    }
+  }catch(err){ console.error('Error al procesar la acción', action, err); }
+});
+
+window.addEventListener('error', (e)=>{ console.error('Error en BuZfinance:', e.error||e.message); });
+
+initFechaHeader();
+detectarVisorRestringido();
+
+// Registra el service worker SOLO si la app está siendo servida por http(s) (hosting real),
+// nunca si se abre como archivo local: ahí no es un contexto seguro y fallaría igualmente.
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
+  navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+}
+try{ renderVista('inicio'); }
+catch(err){ console.error('Error en el primer render', err); }
+</script>
+</body>
+</html>
