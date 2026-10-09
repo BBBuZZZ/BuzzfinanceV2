@@ -377,6 +377,7 @@
         <div class="kv"><div class="k">Retención fiscal intereses<span class="hint">Ej. 0.19 = 19%</span></div><input type="number" step="0.01" id="cfgRetencion"></div>
         <div class="kv"><div class="k">Mes de inicio del plan<span class="hint">YYYY-MM</span></div><input type="month" id="cfgMesInicio" style="width:150px;"></div>
         <div class="kv"><div class="k">Duración del plan<span class="hint">En meses</span></div><input type="number" id="cfgNumMeses"></div>
+        <div class="kv"><div class="k">API Key Finnhub.io<span class="hint">Para cotizaciones (gratuito)</span></div><input type="text" id="cfgApiKey" style="width:110px;" placeholder="Tu API Key"></div>
         <button class="btn" style="margin-top:16px;" data-action="guardar-config">Guardar cambios</button>
       </div>
 
@@ -459,8 +460,8 @@
     <div class="handle"></div>
     <h3>Nuevo producto</h3>
     <div class="field"><label>Nombre</label><input type="text" id="iNombre" placeholder="Ej. Fondo indexado MSCI World"></div>
-    <div class="field"><label>Símbolo bursátil (opcional)</label><input type="text" id="iTicker" placeholder="Ej. envx.us, aapl.us, msft.us"></div>
-    <p class="page-sub" style="margin-top:-10px;">Si lo pones, verás su cotización en directo (según disponibilidad de datos). Formato Stooq: ticker + .us para EE.UU., .uk, .de, etc.</p>
+    <div class="field"><label>Símbolo bursátil (opcional)</label><input type="text" id="iTicker" placeholder="Ej. AAPL, MSFT"></div>
+    <p class="page-sub" style="margin-top:-10px;">Si lo pones y configuras tu API Key en Ajustes, verás su cotización en directo.</p>
     <div class="field-row">
       <div class="field"><label>Importe actual (€)</label><input type="number" step="0.01" id="iImporte"></div>
       <div class="field"><label>Aportación mensual (€)</label><input type="number" step="0.01" id="iAportacion"></div>
@@ -519,7 +520,8 @@ function defaultData(){
       taeDefault:0.03,
       retencionFiscal:0.19,
       mesInicio:"2026-09",
-      numMeses:36
+      numMeses:36,
+      apiKey:""
     },
     categorias:["Comida","Coche / Gasoil","Facturas","Gastos Niños","Ocio","Otros Gastos"],
     recurrentes:{"Comida":450,"Coche / Gasoil":130,"Facturas":200,"Gastos Niños":150,"Ocio":200,"Otros Gastos":100},
@@ -979,6 +981,7 @@ function renderCotizacionHtml(p){
     <span class="cotiz-hora">actualizado ${live.hora}</span>
   </div>`;
 }
+
 async function actualizarCotizaciones(){
   const conTicker = DB.inversiones.filter(p=>p.ticker);
   const statusEl = document.getElementById('cotizStatus');
@@ -1004,24 +1007,33 @@ async function actualizarCotizaciones(){
   }));
   save();
   if(btn) btn.textContent = '↻ Actualizar cotizaciones';
-  if(statusEl) statusEl.textContent = 'Última actualización: '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'. Datos vía Stooq, con retardo — no son para operar en bolsa.';
+  if(statusEl) statusEl.textContent = 'Última actualización: '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'. Datos vía Finnhub.io.';
   renderInversiones();
 }
+
 async function fetchCotizacion(ticker){
-  // Stooq ofrece cotizaciones gratuitas sin necesidad de clave de API, en formato CSV.
-  // El formato de símbolo suele ser "ticker.mercado", ej: envx.us, aapl.us, sap.de
-  const url = 'https://stooq.com/q/l/?s='+encodeURIComponent(ticker)+'&f=sd2t2c2&h&e=csv';
-  const res = await fetch(url, {mode:'cors', cache:'no-store'});
-  if(!res.ok) throw new Error('sin respuesta del servicio');
-  const texto = await res.text();
-  const filas = texto.trim().split('\n');
-  if(filas.length<2) throw new Error('símbolo no encontrado');
-  const cols = filas[1].split(',');
-  const precio = parseFloat(cols[3]);
-  const hora = cols[2] || '';
-  if(!isFinite(precio) || precio<=0) throw new Error('símbolo no encontrado');
+  const apiKey = DB.config.apiKey;
+  if(!apiKey) throw new Error('falta API Key en Ajustes');
+  
+  // Limpiamos sufijos .us o .US para Finnhub, que utiliza símbolos desnudos para US (ej: AAPL)
+  let symbol = ticker.toUpperCase().trim();
+  if(symbol.endsWith('.US')) {
+    symbol = symbol.replace('.US', '');
+  }
+  
+  const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
+  const res = await fetch(url);
+  
+  if(!res.ok) throw new Error('sin respuesta del servicio o API Key inválida');
+  
+  const data = await res.json();
+  if(data.c === 0 && data.d === null) throw new Error('símbolo no encontrado');
+  
+  const precio = data.c;
+  const hora = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
   return {precio, hora};
 }
+
 function borrarInversion(id){
   DB.inversiones = DB.inversiones.filter(i=>i.id!==id);
   save();
@@ -1041,6 +1053,7 @@ function renderConfig(){
   document.getElementById('cfgRetencion').value = c.retencionFiscal;
   document.getElementById('cfgMesInicio').value = c.mesInicio;
   document.getElementById('cfgNumMeses').value = c.numMeses;
+  if(document.getElementById('cfgApiKey')) document.getElementById('cfgApiKey').value = c.apiKey || '';
 
   document.getElementById('cfgRecurrentes').innerHTML = DB.categorias.map(cat=>`
     <div class="kv"><div class="k">${escapeHtml(cat)}</div><input type="number" step="0.01" data-cat="${escapeHtml(cat)}" class="recInput" value="${DB.recurrentes[cat] ?? 0}"></div>
@@ -1061,6 +1074,7 @@ function guardarConfig(){
   c.retencionFiscal = Number(document.getElementById('cfgRetencion').value)||0;
   c.mesInicio = document.getElementById('cfgMesInicio').value || c.mesInicio;
   c.numMeses = Number(document.getElementById('cfgNumMeses').value)||36;
+  if(document.getElementById('cfgApiKey')) c.apiKey = document.getElementById('cfgApiKey').value.trim();
   save();
   toast('Configuración guardada');
 }
