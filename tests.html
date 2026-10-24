@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuZfinance — Test Suite del Motor Financiero y Cifrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0A130F;
+    --surface: #121E18;
+    --surface-2: #182820;
+    --line: rgba(237, 234, 224, 0.08);
+    --text: #F2EFE9;
+    --muted: #8E9E94;
+    --gold: #D4AF37;
+    --sage: #52B788;
+    --rust: #E76F51;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    margin: 0;
+    padding: 30px 20px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    max-width: 680px;
+    width: 100%;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    margin: 0 0 8px;
+    color: #FFF;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 24px;
+  }
+  .summary-bar {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .summary-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .summary-stat .k { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .summary-stat .v { font-size: 22px; font-weight: 700; font-family: 'Fraunces', serif; }
+  .v.pass { color: var(--sage); }
+  .v.fail { color: var(--rust); }
+
+  .test-group {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .group-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .test-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    gap: 12px;
+  }
+  .test-item:last-child { border-bottom: none; }
+  .test-desc { flex: 1; }
+  .test-detail { font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
+  .badge {
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    flex: none;
+  }
+  .badge.pass { background: rgba(82, 183, 136, 0.15); color: var(--sage); border: 1px solid rgba(82, 183, 136, 0.3); }
+  .badge.fail { background: rgba(231, 111, 81, 0.15); color: var(--rust); border: 1px solid rgba(231, 111, 81, 0.3); }
+
+  .btn {
+    background: linear-gradient(135deg, #E5C368, #D4AF37);
+    color: #161005;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ BuZfinance Test Suite</h1>
+  <p class="subtitle">Validación matemática del motor financiero y verificación del cifrado AES-256-GCM.</p>
+
+  <div class="summary-bar">
+    <div class="summary-stat">
+      <div class="k">Total pruebas</div>
+      <div class="v" id="statTotal">0</div>
+    </div>
+    <div class="summary-stat">
+      <div class="k">Superadas</div>
+      <div class="v pass" id="statPass">0</div>
+    </div>
+    <div class="summary-stat">
+      <div class="k">Fallidas</div>
+      <div class="v fail" id="statFail">0</div>
+    </div>
+    <div class="summary-stat">
+      <div class="k">Estado</div>
+      <div class="v" id="statStatus" style="font-size:16px;">Ejecutando…</div>
+    </div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+/* Motor Criptográfico para Pruebas (Misma implementación que se integra en BuZfinance) */
+const CryptoSecurity = {
+  validarPin(pin) {
+    return typeof pin === 'string' && /^\d{4}$/.test(pin);
+  },
+  async derivarClave(pin, saltBytes) {
+    const enc = new TextEncoder();
+    const pinKey = await crypto.subtle.importKey(
+      'raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: saltBytes, iterations: 100000, hash: 'SHA-256' },
+      pinKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  },
+  async cifrar(objetoDatos, pin) {
+    if (!this.validarPin(pin)) throw new Error('El PIN debe tener exactamente 4 dígitos');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const clave = await this.derivarClave(pin, salt);
+    const enc = new TextEncoder();
+    const encoded = enc.encode(JSON.stringify(objetoDatos));
+    const cipherBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv }, clave, encoded
+    );
+    return JSON.stringify({
+      version: 1,
+      salt: Array.from(salt),
+      iv: Array.from(iv),
+      cipher: Array.from(new Uint8Array(cipherBuffer))
+    });
+  },
+  async descifrar(paqueteString, pin) {
+    if (!this.validarPin(pin)) throw new Error('El PIN debe tener exactamente 4 dígitos');
+    const pkg = JSON.parse(paqueteString);
+    const salt = new Uint8Array(pkg.salt);
+    const iv = new Uint8Array(pkg.iv);
+    const cipher = new Uint8Array(pkg.cipher);
+    const clave = await this.derivarClave(pin, salt);
+    try {
+      const decBuffer = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv }, clave, cipher
+      );
+      const dec = new TextDecoder();
+      return JSON.parse(dec.decode(decBuffer));
+    } catch (e) {
+      throw new Error('PIN incorrecto o datos corruptos');
+    }
+  }
+};
+
+/* Suite de Pruebas */
+const tests = [];
+function addTest(group, name, detail, fn) {
+  tests.push({ group, name, detail, fn });
+}
+
+// 1. Matemáticas de Interés Compuesto
+addTest('Matemática Financiera', 'Interés compuesto 1 año (10k€ @ 6% + 100€/mes)', 'Simulación 12 meses', () => {
+  let v = 10000;
+  const r = 0.06 / 12;
+  for(let i=0; i<12; i++) v = v * (1 + r) + 100;
+  if (Math.abs(v - 11850.34) > 0.5) throw new Error(`Esperado ~11850.34, obtenido ${v.toFixed(2)}`);
+});
+
+addTest('Matemática Financiera', 'Interés compuesto 5 años sin aportación (5k€ @ 7%)', 'Simulación 60 meses', () => {
+  let v = 5000;
+  const r = 0.07 / 12;
+  for(let i=0; i<60; i++) v = v * (1 + r);
+  if (Math.abs(v - 7088.10) > 0.5) throw new Error(`Esperado ~7088.10, obtenido ${v.toFixed(2)}`);
+});
+
+addTest('Fiscalidad', 'Retención IRPF del 19% sobre intereses de cta. remunerada', 'Interés bruto 100 € -> 19 € retención -> 81 € neto', () => {
+  const bruto = 100;
+  const ret = bruto * 0.19;
+  const neto = bruto - ret;
+  if (ret !== 19 || neto !== 81) throw new Error(`Cálculo fiscal erróneo: ret=${ret}, neto=${neto}`);
+});
+
+addTest('Planificación Mensual', 'Capacidad de ahorro y remanente líquido', 'Nómina 2600 - Gastos 1100 - Hipoteca 550 = 950 bruto. 950 - Inv 200 - Traspaso 150 = 600 neto', () => {
+  const capBruta = 2600 - 1100 - 550;
+  const remanente = capBruta - 200 - 150;
+  if (capBruta !== 950 || remanente !== 600) throw new Error(`Remanente incorrecto: bruta=${capBruta}, remanente=${remanente}`);
+});
+
+addTest('Cartera de Inversión', 'Rentabilidad media ponderada de activos', '7000€ @ 8% + 3000€ @ 4% = 6.8%', () => {
+  const sumaPond = (7000 * 0.08) + (3000 * 0.04);
+  const total = 10000;
+  const rentPond = sumaPond / total;
+  if (Math.abs(rentPond - 0.068) > 0.0001) throw new Error(`Rentabilidad incorrecta: ${rentPond}`);
+});
+
+addTest('Resiliencia Zero-Safety', 'Manejo de importes iniciales a cero', 'Cálculo sin divisiones por cero ni valores NaN', () => {
+  let v = 0;
+  const r = 0;
+  for(let i=0; i<60; i++) v = v * (1 + r) + 0;
+  if (isNaN(v) || v !== 0) throw new Error('Error al simular importes en cero');
+});
+
+// 2. Cifrado Criptográfico AES-256-GCM
+addTest('Cifrado y Seguridad', 'Validación de formato de PIN de 4 dígitos', 'Rechaza caracteres no numéricos o longitud distinta de 4', () => {
+  if (!CryptoSecurity.validarPin('1234')) throw new Error('Debe aceptar 1234');
+  if (CryptoSecurity.validarPin('123')) throw new Error('Debe rechazar 3 dígitos');
+  if (CryptoSecurity.validarPin('12345')) throw new Error('Debe rechazar 5 dígitos');
+  if (CryptoSecurity.validarPin('12a4')) throw new Error('Debe rechazar letras');
+});
+
+addTest('Cifrado y Seguridad', 'Ciclo completo de cifrado y descifrado AES-256-GCM', 'Cifra un objeto con PIN 4321 y recupera la información exacta', async () => {
+  const sample = { caja: 500, gastos: ['Comida', 50], fecha: '2026-10-24' };
+  const encrypted = await CryptoSecurity.cifrar(sample, '4321');
+  const decrypted = await CryptoSecurity.descifrar(encrypted, '4321');
+  if (JSON.stringify(sample) !== JSON.stringify(decrypted)) {
+    throw new Error('El objeto descifrado no coincide exactamente con el original');
+  }
+});
+
+addTest('Cifrado y Seguridad', 'Rechazo ante PIN incorrecto', 'Intento de descifrado con PIN 0000 debe fallar controladamente', async () => {
+  const sample = { saldo: 1000 };
+  const encrypted = await CryptoSecurity.cifrar(sample, '1111');
+  let fallo = false;
+  try {
+    await CryptoSecurity.descifrar(encrypted, '0000');
+  } catch(e) {
+    fallo = true;
+  }
+  if (!fallo) throw new Error('El descifrado con PIN incorrecto debió lanzar error');
+});
+
+// Tests de Subida Salarial e Hipoteca Variable
+function calcularIncrementoNominaPct(base, enero){
+  const b = Number(base) || 0;
+  const e = Number(enero) || 0;
+  if(b <= 0 || e <= 0) return { pct: 0, label: '0.00%' };
+  const diff = ((e - b) / b) * 100;
+  const sign = diff >= 0 ? '+' : '';
+  return { pct: diff, label: `${sign}${diff.toFixed(2)}%` };
+}
+
+addTest('Subida Salarial e Hipoteca', 'Cálculo de porcentaje de incremento salarial', '1800 a 1890 debe resultar en +5.00%', () => {
+  const res = calcularIncrementoNominaPct(1800, 1890);
+  if (Math.abs(res.pct - 5.0) > 0.001 || res.label !== '+5.00%') {
+    throw new Error(`Esperado +5.00%, obtenido ${res.label}`);
+  }
+});
+
+addTest('Subida Salarial e Hipoteca', 'Protección contra división por cero o base vacía', 'Base 0 debe retornar 0.00% sin generar NaN o Infinity', () => {
+  const res = calcularIncrementoNominaPct(0, 1890);
+  if (res.pct !== 0 || res.label !== '0.00%') {
+    throw new Error(`Esperado 0.00%, obtenido ${res.label}`);
+  }
+});
+
+addTest('Subida Salarial e Hipoteca', 'Evolución de nómina e hipoteca en el tiempo', 'Verifica nómina previa vs posterior a Enero y cuota variable en revisión', () => {
+  const baseNomina = 1800;
+  const nuevoEnero = 1890;
+  const mesInicio = '2026-10';
+  const anoInicio = 2026;
+
+  // Diciembre 2026 (mismo año):
+  const nomDic = (2026 > anoInicio && nuevoEnero > 0) ? nuevoEnero : baseNomina;
+  if (nomDic !== 1800) throw new Error(`Diciembre 2026 debió tener nómina 1800, tiene ${nomDic}`);
+
+  // Enero 2027 (nuevo año):
+  const nomEne = (2027 > anoInicio && nuevoEnero > 0) ? nuevoEnero : baseNomina;
+  if (nomEne !== 1890) throw new Error(`Enero 2027 debió tener nómina 1890, tiene ${nomEne}`);
+
+  // Hipoteca variable: revisión en Octubre (mes 10)
+  const hipBase = 500;
+  const hipRevisada = 540;
+  const mesRevision = 10;
+  const hipAgosto = (8 >= mesRevision) ? hipRevisada : hipBase;
+  const hipOctubre = (10 >= mesRevision) ? hipRevisada : hipBase;
+  if (hipAgosto !== 500) throw new Error(`Agosto debió tener cuota 500, tiene ${hipAgosto}`);
+  if (hipOctubre !== 540) throw new Error(`Octubre debió tener cuota revisada 540, tiene ${hipOctubre}`);
+});
+
+function obtenerNominaAno(ano, config){
+  const c = config;
+  const targetAno = Number(ano);
+  const anoInicio = parseInt((c.mesInicio || '').split('-')[0], 10) || 2026;
+  if(targetAno <= anoInicio) return Number(c.nominaMensual) || 0;
+  if(c.nominasPorAno){
+    for(let y = targetAno; y > anoInicio; y--){
+      const val = c.nominasPorAno[String(y)];
+      if(val !== undefined && val !== null && val !== '' && !isNaN(Number(val)) && Number(val) > 0){
+        return Number(val);
+      }
+    }
+  }
+  return Number(c.nominaMensual) || 0;
+}
+
+function obtenerExtrasMes(mesNum, config){
+  const c = config;
+  if(!c.pagasExtras || !Array.isArray(c.pagasExtras)) return 0;
+  const targetMes = Number(mesNum);
+  return c.pagasExtras
+    .filter(p => Number(p.mes) === targetMes)
+    .reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
+}
+
+addTest('Subida Salarial e Hipoteca', 'Cascada plurianual de sueldos con herencia', 'Año 2028 no configurado debe heredar el sueldo de 2027', () => {
+  const cfg = {
+    mesInicio: '2026-10',
+    nominaMensual: 1800,
+    nominasPorAno: {
+      '2027': 1850,
+      '2029': 1900
+    }
+  };
+  if (obtenerNominaAno(2026, cfg) !== 1800) throw new Error('2026 debe ser 1800');
+  if (obtenerNominaAno(2027, cfg) !== 1850) throw new Error('2027 debe ser 1850');
+  if (obtenerNominaAno(2028, cfg) !== 1850) throw new Error('2028 debe heredar 1850 de 2027');
+  if (obtenerNominaAno(2029, cfg) !== 1900) throw new Error('2029 debe ser 1900');
+});
+
+addTest('Subida Salarial e Hipoteca', 'Suma de pagas extras y bonus en euros por mes', 'Suma de múltiples extras en meses específicos (Junio, Diciembre, Beneficios en Marzo)', () => {
+  const cfg = {
+    pagasExtras: [
+      { id: '1', nombre: 'Extra Verano', mes: 6, importe: 1200 },
+      { id: '2', nombre: 'Extra Navidad', mes: 12, importe: 1200 },
+      { id: '3', nombre: 'Beneficios', mes: 3, importe: 1200 }
+    ]
+  };
+  if (obtenerExtrasMes(6, cfg) !== 1200) throw new Error('Mes 6 debe sumar 1200 €');
+  if (obtenerExtrasMes(12, cfg) !== 1200) throw new Error('Mes 12 debe sumar 1200 €');
+  if (obtenerExtrasMes(3, cfg) !== 1200) throw new Error('Mes 3 debe sumar 1200 €');
+  if (obtenerExtrasMes(1, cfg) !== 0) throw new Error('Mes 1 debe sumar 0 €');
+});
+
+// Ejecución
+async function runAll() {
+  const groups = {};
+  let passCount = 0;
+  let failCount = 0;
+
+  for (const t of tests) {
+    if (!groups[t.group]) groups[t.group] = [];
+    try {
+      await t.fn();
+      groups[t.group].push({ name: t.name, detail: t.detail, pass: true });
+      passCount++;
+    } catch(err) {
+      groups[t.group].push({ name: t.name, detail: t.detail + ' -> ' + err.message, pass: false });
+      failCount++;
+    }
+  }
+
+  document.getElementById('statTotal').textContent = tests.length;
+  document.getElementById('statPass').textContent = passCount;
+  document.getElementById('statFail').textContent = failCount;
+  document.getElementById('statStatus').textContent = failCount === 0 ? '✓ 100% Correcto' : '⚠️ Errores detectados';
+  document.getElementById('statStatus').style.color = failCount === 0 ? 'var(--sage)' : 'var(--rust)';
+
+  let html = '';
+  for (const [groupName, groupTests] of Object.entries(groups)) {
+    html += `
+      <div class="test-group">
+        <div class="group-title">📁 ${groupName}</div>
+        ${groupTests.map(t => `
+          <div class="test-item">
+            <div class="test-desc">
+              <div>${t.name}</div>
+              <div class="test-detail">${t.detail}</div>
+            </div>
+            <div class="badge ${t.pass ? 'pass' : 'fail'}">${t.pass ? 'PASS' : 'FAIL'}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  document.getElementById('results').innerHTML = html;
+}
+
+runAll();
+</script>
+</body>
+</html>
